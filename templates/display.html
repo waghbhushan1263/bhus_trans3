@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>PDF Viewer</title>
+    <style>
+        #translated-text {
+            position: fixed;
+            top: 10px;
+            right: 10px;
+            background-color: #f0f0f0;
+            padding: 10px;
+            border: 1px solid #ccc;
+            max-width: 300px;
+            word-wrap: break-word;
+        }
+        #pdf-container {
+            width: 80%;
+            margin: 20px auto;
+        }
+        .pdf-page {
+            margin-bottom: 20px;
+        }
+        .textLayer {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            opacity: 0.2;
+        }
+        .textLayer > span {
+            color: transparent;
+            position: absolute;
+            white-space: pre;
+            cursor: text;
+        }
+    </style>
+</head>
+<body>
+    <h1>Select Text from PDF</h1>
+    <div id="pdf-container"></div>
+    <div id="translated-text">Translated text will appear here</div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.10.377/pdf.min.js"></script>
+    <script>
+        pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.10.377/pdf.worker.min.js';
+
+        // Get PDF URL from query param
+        const urlParams = new URLSearchParams(window.location.search);
+        const pdfUrl = urlParams.get('pdf');
+
+        if (pdfUrl) {
+            const loadingTask = pdfjsLib.getDocument(pdfUrl);
+            loadingTask.promise.then(pdf => {
+                const numPages = pdf.numPages;
+                const container = document.getElementById('pdf-container');
+
+                for (let pageNum = 1; pageNum <= numPages; pageNum++) {
+                    pdf.getPage(pageNum).then(page => {
+                        const scale = 1.5;
+                        const viewport = page.getViewport({ scale: scale });
+
+                        const canvas = document.createElement('canvas');
+                        const context = canvas.getContext('2d');
+                        canvas.height = viewport.height;
+                        canvas.width = viewport.width;
+
+                        const pageDiv = document.createElement('div');
+                        pageDiv.className = 'pdf-page';
+                        pageDiv.style.position = 'relative';
+                        pageDiv.style.width = viewport.width + 'px';
+                        pageDiv.style.height = viewport.height + 'px';
+                        pageDiv.appendChild(canvas);
+                        container.appendChild(pageDiv);
+
+                        const renderContext = {
+                            canvasContext: context,
+                            viewport: viewport
+                        };
+                        const renderTask = page.render(renderContext);
+
+                        renderTask.promise.then(() => {
+                            return page.getTextContent();
+                        }).then(textContent => {
+                            const textLayerDiv = document.createElement('div');
+                            textLayerDiv.className = 'textLayer';
+                            textLayerDiv.style.width = viewport.width + 'px';
+                            textLayerDiv.style.height = viewport.height + 'px';
+                            pageDiv.appendChild(textLayerDiv);
+
+                            pdfjsLib.renderTextLayer({
+                                textContent: textContent,
+                                container: textLayerDiv,
+                                viewport: viewport,
+                                textDivs: []
+                            });
+                        });
+                    });
+                }
+            }).catch(error => console.error('Error loading PDF:', error));
+        }
+
+        // Translate selected text
+        document.addEventListener('mouseup', function() {
+            const selectedText = window.getSelection().toString().trim();
+            if (selectedText) {
+                fetch('/api/translate', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ text: selectedText })
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.translated_text) {
+                        document.getElementById('translated-text').innerText = data.translated_text;
+                    }
+                })
+                .catch(error => console.error('Error:', error));
+            }
+        });
+    </script>
+</body>
+</html>
