@@ -45,18 +45,19 @@
     <script>
         pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.10.377/pdf.worker.min.js';
 
-        // Get PDF URL from query param
-        const urlParams = new URLSearchParams(window.location.search);
-        const pdfUrl = urlParams.get('pdf');
+        const pdfUrl = '/api/pdf';  // Fetch from server
+        console.log('Fetching PDF from:', pdfUrl);
 
-        if (pdfUrl) {
-            const loadingTask = pdfjsLib.getDocument(pdfUrl);
-            loadingTask.promise.then(pdf => {
+        const loadingTask = pdfjsLib.getDocument(pdfUrl);
+        loadingTask.promise
+            .then(pdf => {
+                console.log('PDF loaded, pages:', pdf.numPages);
                 const numPages = pdf.numPages;
                 const container = document.getElementById('pdf-container');
 
                 for (let pageNum = 1; pageNum <= numPages; pageNum++) {
                     pdf.getPage(pageNum).then(page => {
+                        console.log('Rendering page:', pageNum);
                         const scale = 1.5;
                         const viewport = page.getViewport({ scale: scale });
 
@@ -80,6 +81,7 @@
                         const renderTask = page.render(renderContext);
 
                         renderTask.promise.then(() => {
+                            console.log('Page rendered:', pageNum);
                             return page.getTextContent();
                         }).then(textContent => {
                             const textLayerDiv = document.createElement('div');
@@ -94,16 +96,20 @@
                                 viewport: viewport,
                                 textDivs: []
                             });
-                        });
-                    });
+                            console.log('Text layer added for page:', pageNum);
+                        }).catch(err => console.error('Text layer error:', err));
+                    }).catch(err => console.error('Page load error:', err));
                 }
-            }).catch(error => console.error('Error loading PDF:', error));
-        }
+            })
+            .catch(error => {
+                console.error('PDF load failed:', error);
+                alert('Failed to load PDF: ' + error.message);
+            });
 
-        // Translate selected text
         document.addEventListener('mouseup', function() {
             const selectedText = window.getSelection().toString().trim();
             if (selectedText) {
+                console.log('Selected text:', selectedText);
                 fetch('/api/translate', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -113,9 +119,10 @@
                 .then(data => {
                     if (data.translated_text) {
                         document.getElementById('translated-text').innerText = data.translated_text;
+                        console.log('Translated:', data.translated_text);
                     }
                 })
-                .catch(error => console.error('Error:', error));
+                .catch(error => console.error('Translation error:', error));
             }
         });
     </script>
