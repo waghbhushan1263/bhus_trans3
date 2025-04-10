@@ -2,10 +2,9 @@ from flask import Flask, request, jsonify, render_template, Response
 from googletrans import Translator
 from io import BytesIO
 
-app = Flask(__name__)
+app = Flask(__name__, template_folder='../public')  # Point to public/
 translator = Translator()
 
-# Store PDF in memory
 pdf_buffer = None
 
 @app.route('/', methods=['GET', 'POST'])
@@ -19,7 +18,7 @@ def upload_pdf():
             if pdf_file.filename == '':
                 return "No file selected", 400
             pdf_buffer = BytesIO(pdf_file.read())
-            print("PDF uploaded, size:", pdf_buffer.getbuffer().nbytes)  # Debug
+            print("PDF uploaded, size:", pdf_buffer.getbuffer().nbytes)
             return render_template('display.html')
         return render_template('index.html')
     except Exception as e:
